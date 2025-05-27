@@ -16,6 +16,7 @@
 
 
 import argparse
+import json
 import os
 import sys
 from typing import Any
@@ -42,8 +43,10 @@ from align_anything.utils.tools import (
     prepare_ds_train_cfgs,
     read_cfgs,
     seed_everything,
+    split_prompt_response,
     update_dict,
 )
+import pdb
 
 
 class RMTrainer(SupervisedTrainerBase):
@@ -86,9 +89,11 @@ class RMTrainer(SupervisedTrainerBase):
 
     def init_datasets(self) -> None:
         """Initialize training and evaluation datasets."""
+        #pdb.set_trace()
         self.train_dataloader, self.eval_dataloader = self.get_dataloaders(
             PreferenceDataset, PreferenceDataset
         )
+        #pdb.set_trace()
 
     def init_engines(self) -> None:
         """Initialize DeepSpeed engines."""
@@ -158,6 +163,8 @@ class RMTrainer(SupervisedTrainerBase):
         self.logger.print('\n***** Evaluating at the beginning *****')
         if self.eval_dataloader is None:
             return {}
+        
+        #pdb.set_trace()
 
         self.model.eval()
         if self.cfgs.train_cfgs.gradient_checkpointing:
@@ -172,21 +179,77 @@ class RMTrainer(SupervisedTrainerBase):
             position=1,
             leave=False,
         )
+        #pdb.set_trace()
 
         rewards = []
+        log_higher_rewards=[]
+        log_lower_rewards=[]
+        log_higher_prompt_and_responses = []
+        log_lower_prompt_and_responses = []
+        data_with_score = []
         batch = None
+
         for batch in eval_dataloader:
+            pdb.set_trace()
+            # TODO：看下batch的内容，补充better和worse的区分
             output = self.model(**self.infer_batch(batch))
             end_scores = output.end_scores
+
             higher_end_rewards, lower_end_rewards = end_scores.squeeze(dim=-1).chunk(
                 chunks=2, dim=0
             )
+
+            #存储分数
+            #好答案的分数
+            log_higher_rewards.append(higher_end_rewards)
+            #差答案的分数
+            log_lower_rewards.append(lower_end_rewards)
+
             batch_size = higher_end_rewards.size(0)
             num_correct_predictions += (higher_end_rewards > lower_end_rewards).sum()
             num_total_predictions += batch_size
 
             rewards.extend([higher_end_rewards, lower_end_rewards])
 
+            decoded_prompt_and_response = self.tokenizer.batch_decode(
+                batch['input_ids'], skip_special_tokens=True
+            )
+            pdb.set_trace()
+            #存储提示词和回复
+
+            if len(decoded_prompt_and_response) % 2 != 0:
+                raise ValueError("列表长度必须为偶数")
+            else:
+                mid = len(decoded_prompt_and_response) // 2
+                log_higher_prompt_and_responses.append(decoded_prompt_and_response[:mid])
+                log_lower_prompt_and_responses.append(decoded_prompt_and_response[mid:])  
+        pdb.set_trace()
+        
+        for h_c,l_c,h_r,l_r in zip(log_higher_prompt_and_responses,log_lower_prompt_and_responses,log_higher_rewards,log_lower_rewards):
+                #pdb.set_trace()
+                for x in range(len(h_c)):
+                    data_with_score.append(
+                        {
+                            'h_c': h_c[x].strip(),
+                            'l_c': l_c[x].strip(),
+                            'h_r':h_r[x].item(),
+                            'l_r':l_r[x].item()
+                        }
+                    )
+        pdb.set_trace()
+        output_name = os.path.join(
+            self.cfgs.logger_cfgs.output_dir, 'tmp', f'process_{dist.get_rank()}.json'
+        )
+        os.makedirs(os.path.dirname(output_name), exist_ok=True)
+        #pdb.set_trace()
+        with open(output_name, 'w') as f:
+            json.dump(data_with_score, f, indent=4)
+            print(f'Saved {len(data_with_score)} samples to {output_name}')
+
+        dist.barrier()    
+
+        #pdb.set_trace()
+        
         if batch is None:
             self.logger.print('WARNING: `eval_dataloader` is empty.')
             return {}
@@ -217,7 +280,7 @@ class RMTrainer(SupervisedTrainerBase):
 
         if is_main_process():
             # Print some examples from the last batch
-            max_num_rows = 5
+            max_num_rows = 20
             (
                 better_input_ids,  # size = (B, L)
                 worse_input_ids,  # size = (B, L)
@@ -262,6 +325,7 @@ class RMTrainer(SupervisedTrainerBase):
     def train(self) -> None:
         """Train the model."""
         self.logger.print('***** Running training *****')
+        #pdb.set_trace()
 
         progress_bar = tqdm(
             total=self.cfgs.train_cfgs.epochs * len(self.train_dataloader),
@@ -271,16 +335,16 @@ class RMTrainer(SupervisedTrainerBase):
             disable=not is_main_process(),
         )
         progress_bar.update(self.global_step)
-
+        #pdb.set_trace()
         if self.cfgs.data_cfgs.eval_datasets:
             self.logger.log(self.eval(), step=0)
-
+        #pdb.set_trace()
         remain_epoch = self.cfgs.train_cfgs.epochs - (
             self.global_step // len(self.train_dataloader)
         )
 
         start_batch_idx = self.global_step % len(self.train_dataloader)
-
+        #pdb.set_trace()
         for epoch in range(int(remain_epoch)):
             self.model.train()
             progress_bar.set_description(

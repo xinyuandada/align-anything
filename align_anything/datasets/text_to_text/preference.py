@@ -27,6 +27,7 @@ from transformers.tokenization_utils import PaddingStrategy, TruncationStrategy
 from align_anything.utils.multi_process import get_current_device, is_main_process
 from align_anything.utils.tools import left_padding, right_padding
 from datasets import load_dataset
+import pdb
 
 
 __all__ = [
@@ -69,6 +70,8 @@ class PreferenceDataset(Dataset):
         self.processor = processor
         self.template = template
 
+        #pdb.set_trace()
+        
         if isinstance(optional_args, str):
             optional_args = [optional_args]
         if path.endswith('json'):
@@ -90,6 +93,9 @@ class PreferenceDataset(Dataset):
                 *optional_args,
                 trust_remote_code=True,
             )
+
+        #pdb.set_trace()
+
         if size:
             size = min(size, len(self.raw_data))
             self.raw_data = self.raw_data.select(range(int(size)))

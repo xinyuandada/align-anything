@@ -35,7 +35,7 @@ if [ -z "$OUTPUT_ROOT_DIR" ]; then
     OUTPUT_ROOT_DIR="../outputs"
 fi
 
-OUTPUT_DIR="${OUTPUT_ROOT_DIR}/qwen_2_5_rm/5_14_one-epoch" # output dir
+OUTPUT_DIR="${OUTPUT_ROOT_DIR}/qwen_2_5_rm/5_16_three-epoch" # output dir
 
 # For wandb online logging
 export WANDB_API_KEY="5947a4df1bd19d75524f2c0896d2cf97bc2dc724"
@@ -53,4 +53,4 @@ deepspeed \
      --train_datasets ${TRAIN_DATASETS} \
      --train_split ${TRAIN_SPLIT} \
      --output_dir ${OUTPUT_DIR} \
-     --epochs 1
+     --epochs 3

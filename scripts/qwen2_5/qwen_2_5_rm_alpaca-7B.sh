@@ -19,10 +19,10 @@
 MODEL_NAME_OR_PATH="/data/zhangyanhong-2401220256/Qwen2.5-0.5B-Instruct" # model path 
 #1、修改模型地址
 
-TRAIN_DATASETS="/data/zhangyanhong-2401220256/align_anything_t2t/train" # rm dataset path
+TRAIN_DATASETS="/data/zhangyanhong-2401220256/Alpaca-7B" # rm dataset path
 #2、修改数据路径
 
-TRAIN_TEMPLATE="HOMEWORK" # dataset template
+TRAIN_TEMPLATE="PKUSafeRLHF" # dataset template
 #3、修改训练模版
 
 TRAIN_SPLIT="train" # split the dataset
@@ -35,7 +35,7 @@ if [ -z "$OUTPUT_ROOT_DIR" ]; then
     OUTPUT_ROOT_DIR="../outputs"
 fi
 
-OUTPUT_DIR="${OUTPUT_ROOT_DIR}/qwen_2_5_rm/5_14_one-epoch" # output dir
+OUTPUT_DIR="${OUTPUT_ROOT_DIR}/alpaca/qwen_2_5_rm" # output dir
 
 # For wandb online logging
 export WANDB_API_KEY="5947a4df1bd19d75524f2c0896d2cf97bc2dc724"
@@ -53,4 +53,4 @@ deepspeed \
      --train_datasets ${TRAIN_DATASETS} \
      --train_split ${TRAIN_SPLIT} \
      --output_dir ${OUTPUT_DIR} \
-     --epochs 1
+     --epochs 1 

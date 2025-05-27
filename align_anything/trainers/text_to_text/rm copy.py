@@ -44,6 +44,7 @@ from align_anything.utils.tools import (
     seed_everything,
     update_dict,
 )
+import pdb
 
 
 class RMTrainer(SupervisedTrainerBase):
@@ -86,9 +87,11 @@ class RMTrainer(SupervisedTrainerBase):
 
     def init_datasets(self) -> None:
         """Initialize training and evaluation datasets."""
+        #pdb.set_trace()
         self.train_dataloader, self.eval_dataloader = self.get_dataloaders(
             PreferenceDataset, PreferenceDataset
         )
+        #pdb.set_trace()
 
     def init_engines(self) -> None:
         """Initialize DeepSpeed engines."""
@@ -156,8 +159,17 @@ class RMTrainer(SupervisedTrainerBase):
     def eval(self) -> dict[str, Any]:
         """Evaluate the model on the evaluation dataset."""
         self.logger.print('\n***** Evaluating at the beginning *****')
+
+        #避免一些报错
+        # if len(self.eval_dataloader) == 0:
+        #     self.logger.print('WARNING: `eval_dataloader` is 0!')
+        #     return
+
         if self.eval_dataloader is None:
+            self.logger.print('WARNING: `eval_dataloader` is None!')
             return {}
+        
+        #pdb.set_trace()
 
         self.model.eval()
         if self.cfgs.train_cfgs.gradient_checkpointing:
@@ -172,10 +184,12 @@ class RMTrainer(SupervisedTrainerBase):
             position=1,
             leave=False,
         )
+        #pdb.set_trace()
 
         rewards = []
         batch = None
         for batch in eval_dataloader:
+            #pdb.set_trace()
             output = self.model(**self.infer_batch(batch))
             end_scores = output.end_scores
             higher_end_rewards, lower_end_rewards = end_scores.squeeze(dim=-1).chunk(
@@ -187,6 +201,8 @@ class RMTrainer(SupervisedTrainerBase):
 
             rewards.extend([higher_end_rewards, lower_end_rewards])
 
+        #pdb.set_trace()
+        
         if batch is None:
             self.logger.print('WARNING: `eval_dataloader` is empty.')
             return {}
@@ -217,7 +233,7 @@ class RMTrainer(SupervisedTrainerBase):
 
         if is_main_process():
             # Print some examples from the last batch
-            max_num_rows = 5
+            max_num_rows = 20
             (
                 better_input_ids,  # size = (B, L)
                 worse_input_ids,  # size = (B, L)
@@ -262,7 +278,13 @@ class RMTrainer(SupervisedTrainerBase):
     def train(self) -> None:
         """Train the model."""
         self.logger.print('***** Running training *****')
+        #pdb.set_trace()
 
+        #避免一些报错
+        if len(self.train_dataloader) == 0:
+            self.logger.print('WARNING: `train_dataloader` is empty.')
+            return 
+        
         progress_bar = tqdm(
             total=self.cfgs.train_cfgs.epochs * len(self.train_dataloader),
             desc=f'Training 1/{self.cfgs.train_cfgs.epochs} epoch',
@@ -271,16 +293,16 @@ class RMTrainer(SupervisedTrainerBase):
             disable=not is_main_process(),
         )
         progress_bar.update(self.global_step)
-
+        #pdb.set_trace()
         if self.cfgs.data_cfgs.eval_datasets:
             self.logger.log(self.eval(), step=0)
-
+        #pdb.set_trace()
         remain_epoch = self.cfgs.train_cfgs.epochs - (
             self.global_step // len(self.train_dataloader)
         )
 
         start_batch_idx = self.global_step % len(self.train_dataloader)
-
+        #pdb.set_trace()
         for epoch in range(int(remain_epoch)):
             self.model.train()
             progress_bar.set_description(
@@ -322,6 +344,7 @@ class RMTrainer(SupervisedTrainerBase):
                     self.logger.print(f'\n***** Evaluating at step {self.global_step} *****')
                     self.logger.log(self.eval(), step=self.global_step)
 
+            # TODO：训练时不处理eval相关
             self.logger.print('\n***** Evaluating...*****')
             self.logger.log(self.eval(), step=self.global_step)
 
